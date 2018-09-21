@@ -1,0 +1,101 @@
+#!/bin/bash
+# 0.1
+# Problema: Xrandr ocasionalmente não reconhece a resolução de outros monitores
+# conectados via cabo VGA, em notebooks mais antigos.
+# Adiciona resolução desconhecida ao 2° monitor , através do Xrandr.
+# Testado no Ubuntu
+clear
+
+resDisp(){ 
+
+fim=$(xrandr | grep -m 1 "HDMI" | awk '{print $1}')  
+
+	xrandr | sed "/$vgaInput/,/$fim/!d;//d" 
+	read -p "Pressione qualquer tecla para voltar"
+}
+					
+addResolucao(){
+
+	read -p "Digite a resolução: " width height
+	sleep 1.1
+
+	echo -e "\033[01;33m $: cvt $width $height\033[01;37m"
+	sleep 1.51
+	#Recupera as informações da nova resolução
+	if exibeCvt=$(cvt $width $height | tee /dev/tty); then
+		echo -e "\033[01;32m [OK]\033[01;37m \n"
+	fi
+
+	novoModo+='"'
+	novoModo+=$( echo $exibeCvt | cut -d '"' -f2 | tee /dev/tty)
+	novoModo+='"'
+
+	#Cria novo modo de resolução no Xrandr
+	echo ""
+	echo -e "\033[01;33m $: xrandr --newmode $exibeCvt \033[01;37m"
+	sleep 1.5
+	#recupera o novo modo ex: ("1440x900_60.00" 106.50 1440 1528 1672 1904 900 903 909 934 -hsync +vsync
+	newValue='"'
+	newValue+=$( echo $exibeCvt | cut -d '"' -f 2- | tee /dev/tty)
+	if xrandr --newmode $newValue; then
+			echo -e "\033[01;32m [OK]\033[01;37m \n"
+	else
+		echo -e "\033[01;31m [ERROR]\033[01;37m \n"
+	fi
+
+	#Adiciona nova resolução
+	echo -e "\033[01;33m $: xrandr --addmode $vgaInput $novoModo\033[01;37m"
+	sleep 1.5
+	if xrandr --addmode $vgaInput $novoModo; then
+		echo -e "\033[01;32m [OK]\033[01;37m \n"
+	else
+		echo -e "\033[01;31m [ERROR]\033[01;37m \n"
+	fi	
+
+	read -p "Aplicar nova resolução ? [Y/N]" aplicar 
+	if [ "$aplicar" == "Y" ]; then
+
+		#Aplica a nova resolução
+		echo -e "\033[01;33m $: xrandr --output $vgaInput --mode $novoModo\033[01;37m"
+		if xrandr --output $vgaInput --mode $novoModo; then
+			echo -e "\033[01;32m [OK]\033[01;37m"
+		else
+			echo -e "\033[01;31m [ERROR]\033[01;37m \n"
+		fi
+	fi
+
+	read -p "Pressione qualquer tecla para voltar"
+}
+
+### MAIN 
+
+# O nome da entrada VGA pode variar dependendo da distro
+# por isso é necessário recuperar o nome corretamente
+vgaInput+=$(xrandr | grep "VGA" | awk '{print $1}')
+
+while [[ $op -ne 3 ]]; do
+
+clear	
+read -p "
+ ---------------------------
+-       XrandrVGA_0.2       -
+ ---------------------------
+
+ 1-) Resoluções disponíveis
+ 2-) Adicionar Resolução
+ 3-) Sair
+ 
+ : " op					
+
+	case $op in
+		1)
+			resDisp	
+			;;
+		2)
+			addResolucao
+			;;
+	default)
+			;;
+	esac
+
+done
